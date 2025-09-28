@@ -3,15 +3,15 @@ package main
 import (
 	"log"
 	"net/http"
-	"time"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/your-username/reverse-geocoder-go/pkg/rgeocoder"
 )
 
 // apiServer 封装 HTTP 逻辑
- type apiServer struct {
+type apiServer struct {
 	geo *rgeocoder.RGeocoder
 }
 
@@ -31,17 +31,29 @@ func (s *apiServer) health(c *gin.Context) {
 func (s *apiServer) reverse(c *gin.Context) {
 	latStr := c.Query("lat")
 	lonStr := c.Query("lon")
-	if latStr == "" || lonStr == "" { c.JSON(http.StatusBadRequest, gin.H{"error":"missing lat or lon"}); return }
+	if latStr == "" || lonStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing lat or lon"})
+		return
+	}
 	lat, err1 := strconv.ParseFloat(latStr, 64)
 	lon, err2 := strconv.ParseFloat(lonStr, 64)
-	if err1 != nil || err2 != nil { c.JSON(http.StatusBadRequest, gin.H{"error":"invalid lat or lon"}); return }
+	if err1 != nil || err2 != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid lat or lon"})
+		return
+	}
 	loc, err := s.geo.QuerySingle(rgeocoder.Coordinate{Lat: lat, Lon: lon})
-	if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}); return }
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, loc)
 }
 
 type batchRequest struct {
-	Points []struct { Lat float64 `json:"lat"`; Lon float64 `json:"lon"` } `json:"points"`
+	Points []struct {
+		Lat float64 `json:"lat"`
+		Lon float64 `json:"lon"`
+	} `json:"points"`
 }
 
 type batchResponse struct {
@@ -50,11 +62,19 @@ type batchResponse struct {
 
 func (s *apiServer) batch(c *gin.Context) {
 	var req batchRequest
-	if err := c.ShouldBindJSON(&req); err != nil { c.JSON(http.StatusBadRequest, gin.H{"error":"invalid body"}); return }
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		return
+	}
 	coords := make([]rgeocoder.Coordinate, 0, len(req.Points))
-	for _, p := range req.Points { coords = append(coords, rgeocoder.Coordinate{Lat: p.Lat, Lon: p.Lon}) }
+	for _, p := range req.Points {
+		coords = append(coords, rgeocoder.Coordinate{Lat: p.Lat, Lon: p.Lon})
+	}
 	locs, err := s.geo.Query(coords)
-	if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()}); return }
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, batchResponse{Results: locs})
 }
 
