@@ -23,8 +23,23 @@ func (s *apiServer) register(r *gin.Engine) {
 	r.POST("/batch", s.batch)
 }
 
+// 统一响应结构
+type apiResponse struct {
+	Code    int         `json:"code"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data"`
+}
+
+func respond(c *gin.Context, code int, message string, data interface{}) {
+	c.JSON(http.StatusOK, apiResponse{Code: code, Message: message, Data: data})
+}
+
+func respondError(c *gin.Context, code int, message string) {
+	c.JSON(http.StatusOK, apiResponse{Code: code, Message: message, Data: nil})
+}
+
 func (s *apiServer) health(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"status": "ok", "time": time.Now().UTC()})
+	respond(c, 0, "ok", gin.H{"time": time.Now().UTC()})
 }
 
 // /reverse?lat=..&lon=..
@@ -32,21 +47,21 @@ func (s *apiServer) reverse(c *gin.Context) {
 	latStr := c.Query("lat")
 	lonStr := c.Query("lon")
 	if latStr == "" || lonStr == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing lat or lon"})
+		respondError(c, 40001, "missing lat or lon")
 		return
 	}
 	lat, err1 := strconv.ParseFloat(latStr, 64)
 	lon, err2 := strconv.ParseFloat(lonStr, 64)
 	if err1 != nil || err2 != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid lat or lon"})
+		respondError(c, 40002, "invalid lat or lon")
 		return
 	}
 	loc, err := s.geo.QuerySingle(rgeocoder.Coordinate{Lat: lat, Lon: lon})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, 50001, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, loc)
+	respond(c, 0, "success", loc)
 }
 
 type batchRequest struct {
@@ -56,14 +71,12 @@ type batchRequest struct {
 	} `json:"points"`
 }
 
-type batchResponse struct {
-	Results []rgeocoder.Location `json:"results"`
-}
+// batchResponse 去掉外层自定义结构，直接放进 data
 
 func (s *apiServer) batch(c *gin.Context) {
 	var req batchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+		respondError(c, 40010, "invalid body")
 		return
 	}
 	coords := make([]rgeocoder.Coordinate, 0, len(req.Points))
@@ -72,10 +85,10 @@ func (s *apiServer) batch(c *gin.Context) {
 	}
 	locs, err := s.geo.Query(coords)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, 50002, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, batchResponse{Results: locs})
+	respond(c, 0, "success", locs)
 }
 
 func runHTTPServer(geo *rgeocoder.RGeocoder, addr string) error {
