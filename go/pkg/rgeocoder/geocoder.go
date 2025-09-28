@@ -65,19 +65,17 @@ func NewRGeocoder(opts ...Option) (*RGeocoder, error) {
 		return nil, err
 	}
 
-	// 加载数据: 优先新目录 ./data, 回退旧目录 ./go/data
+	// 加载数据 (允许空数据集，而不是 panic，以便测试和首次运行)
 	citiesFile := filepath.Join(cfg.DataDir, "rg_cities1000.csv")
-	fmt.Printf("checking data file: %s\n", citiesFile)
-
-	if _, errStat := os.Stat(citiesFile); errors.Is(errStat, os.ErrNotExist) {
-		panic("data file rg_cities1000.csv not found; please download or generate it in " + cfg.DataDir)
+	if cfg.Verbose {
+		fmt.Printf("checking data file: %s\n", citiesFile)
 	}
 
 	var coords []Coordinate
 	var locs []Location
-	if _, err := os.Stat(citiesFile); errors.Is(err, os.ErrNotExist) {
+	if _, errStat := os.Stat(citiesFile); errors.Is(errStat, os.ErrNotExist) {
 		if cfg.Verbose {
-			fmt.Println("dataset not found, using empty dataset")
+			fmt.Println("dataset not found, starting with empty dataset (place file at:", citiesFile, ")")
 		}
 	} else {
 		loader := NewDataLoader(cfg)
