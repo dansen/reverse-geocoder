@@ -39,6 +39,9 @@ func WithDataDir(dir string) Option { return func(c *Config) { c.DataDir = dir }
 // WithMaxWorkers 设置并发
 func WithMaxWorkers(n int) Option { return func(c *Config) { c.MaxWorkers = n } }
 
+// WithDistanceMode 设置距离模式
+func WithDistanceMode(m DistanceMode) Option { return func(c *Config) { c.DistanceMode = m } }
+
 // applyOptions 应用默认与用户选项
 func applyOptions(opts []Option) *Config {
 	cfg := &Config{
@@ -48,6 +51,7 @@ func applyOptions(opts []Option) *Config {
 		DownloadURLs: DefaultURLs,
 		MaxWorkers:   0,
 		CacheEnabled: true,
+		DistanceMode: DistanceHaversine,
 	}
 	for _, o := range opts {
 		o(cfg)
@@ -92,11 +96,12 @@ func NewRGeocoder(opts ...Option) (*RGeocoder, error) {
 		}
 	}
 
+	// 构建KD树，传入距离模式
 	var tree KDTreeInterface
 	if cfg.Mode == SingleThreaded {
-		tree = NewKDTree(coords)
+		tree = NewKDTree(coords, cfg.DistanceMode)
 	} else {
-		tree = NewKDTreeMP(coords, cfg.MaxWorkers)
+		tree = NewKDTreeMP(coords, cfg.MaxWorkers, cfg.DistanceMode)
 	}
 
 	return &RGeocoder{mode: cfg.Mode, verbose: cfg.Verbose, tree: tree, locations: locs, config: cfg}, nil
@@ -112,9 +117,9 @@ func NewRGeocoderWithStream(stream io.Reader, opts ...Option) (*RGeocoder, error
 	}
 	var tree KDTreeInterface
 	if cfg.Mode == SingleThreaded {
-		tree = NewKDTree(coords)
+		tree = NewKDTree(coords, cfg.DistanceMode)
 	} else {
-		tree = NewKDTreeMP(coords, cfg.MaxWorkers)
+		tree = NewKDTreeMP(coords, cfg.MaxWorkers, cfg.DistanceMode)
 	}
 	return &RGeocoder{mode: cfg.Mode, verbose: cfg.Verbose, tree: tree, locations: locs, config: cfg}, nil
 }

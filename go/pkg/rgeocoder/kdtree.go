@@ -16,13 +16,23 @@ type Node struct {
 
 // KDTree 包含根节点与点集合
 type KDTree struct {
-	root   *Node
-	points []Coordinate
+	root           *Node
+	points         []Coordinate
+	distanceFun    func(a, b Coordinate) float64
+	haversinePrune bool
 }
 
 // NewKDTree 构建中位数分割KD树
-func NewKDTree(points []Coordinate) *KDTree {
+func NewKDTree(points []Coordinate, mode DistanceMode) *KDTree {
 	t := &KDTree{points: points}
+	mode = DistanceEuclideanDegrees
+	if mode == DistanceEuclideanDegrees {
+		t.distanceFun = func(a, b Coordinate) float64 { return math.Hypot(a.Lat-b.Lat, a.Lon-b.Lon) }
+		t.haversinePrune = false
+	} else { // 默认Haversine
+		t.distanceFun = func(a, b Coordinate) float64 { return haversine(a.Lat, a.Lon, b.Lat, b.Lon) }
+		t.haversinePrune = true
+	}
 	if len(points) > 0 {
 		indices := make([]int, len(points))
 		for i := range indices {
@@ -56,14 +66,14 @@ func buildKD(pts []Coordinate, idxs []int, depth int) *Node {
 func (t *KDTree) Query(coords []Coordinate, k int) ([]float64, []int, error) {
 	if k != 1 {
 		k = 1
-	} // 当前只实现最近一个
+	}
 	dists := make([]float64, len(coords))
 	indices := make([]int, len(coords))
 	for i, q := range coords {
 		bestIdx := -1
 		bestDist := math.MaxFloat64
-		searchNN(t.root, q, &bestIdx, &bestDist)
-		if bestIdx == -1 { // 空树
+		searchNNCustom(t.root, q, &bestIdx, &bestDist, t.distanceFun, t.haversinePrune)
+		if bestIdx == -1 {
 			dists[i] = math.NaN()
 			indices[i] = -1
 		} else {
@@ -75,38 +85,40 @@ func (t *KDTree) Query(coords []Coordinate, k int) ([]float64, []int, error) {
 }
 
 // 递归最近邻搜索
-func searchNN(node *Node, target Coordinate, bestIdx *int, bestDist *float64) {
+func searchNNCustom(node *Node, target Coordinate, bestIdx *int, bestDist *float64, distFn func(a, b Coordinate) float64, haversinePrune bool) {
 	if node == nil {
 		return
 	}
-	d := haversine(target.Lat, target.Lon, node.Point.Lat, node.Point.Lon)
+	d := distFn(target, node.Point)
 	if d < *bestDist {
 		*bestDist = d
 		*bestIdx = node.Index
 	}
 	var goLeft bool
-	if node.Axis == 0 { // 比较纬度
+	if node.Axis == 0 {
 		goLeft = target.Lat < node.Point.Lat
 	} else {
 		goLeft = target.Lon < node.Point.Lon
 	}
-	first := node.Left
-	second := node.Right
+	first, second := node.Left, node.Right
 	if !goLeft {
 		first, second = second, first
 	}
-	searchNN(first, target, bestIdx, bestDist)
-	// 判断是否需要访问另一侧
-	var axisDist float64
+	searchNNCustom(first, target, bestIdx, bestDist, distFn, haversinePrune)
+	var axisDiff float64
 	if node.Axis == 0 {
-		axisDist = math.Abs(target.Lat - node.Point.Lat)
+		axisDiff = math.Abs(target.Lat - node.Point.Lat)
 	} else {
-		axisDist = math.Abs(target.Lon - node.Point.Lon)
+		axisDiff = math.Abs(target.Lon - node.Point.Lon)
 	}
-	// 粗略用地表距离界限: 如果轴向差转换成近似距离小于当前bestDist才回溯
-	// 这里用 111km * 度差 近似
-	if axisDist*111.0 < *bestDist {
-		searchNN(second, target, bestIdx, bestDist)
+	if haversinePrune {
+		if axisDiff*111.0 < *bestDist {
+			searchNNCustom(second, target, bestIdx, bestDist, distFn, haversinePrune)
+		}
+	} else {
+		if axisDiff < *bestDist {
+			searchNNCustom(second, target, bestIdx, bestDist, distFn, haversinePrune)
+		}
 	}
 }
 

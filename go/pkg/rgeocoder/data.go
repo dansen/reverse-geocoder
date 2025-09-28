@@ -55,7 +55,16 @@ type Config struct {
 	DownloadURLs URLs
 	MaxWorkers   int
 	CacheEnabled bool
+	DistanceMode DistanceMode
 }
+
+// DistanceMode 距离模式
+type DistanceMode int
+
+const (
+	DistanceHaversine        DistanceMode = iota // 球面距离(默认)
+	DistanceEuclideanDegrees                     // 直接纬经度欧氏，与Python reverse_geocoder一致
+)
 
 // URLs GeoNames数据下载URL集合
 type URLs struct {

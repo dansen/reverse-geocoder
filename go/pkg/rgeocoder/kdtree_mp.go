@@ -12,11 +12,11 @@ type KDTreeMP struct {
 }
 
 // NewKDTreeMP 创建多线程版本（占位）
-func NewKDTreeMP(points []Coordinate, workers int) *KDTreeMP {
+func NewKDTreeMP(points []Coordinate, workers int, mode DistanceMode) *KDTreeMP {
 	if workers <= 0 {
 		workers = 4
 	}
-	return &KDTreeMP{base: NewKDTree(points), workers: workers}
+	return &KDTreeMP{base: NewKDTree(points, mode), workers: workers}
 }
 
 // Query 并发查询（暂时顺序调用）
