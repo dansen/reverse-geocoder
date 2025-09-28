@@ -13,7 +13,7 @@ import (
 func main() {
 	mode := flag.Int("mode", 2, "查询模式: 1=单线程 2=多线程")
 	verbose := flag.Bool("verbose", false, "是否输出详细日志")
-	httpAddr := flag.String("http", "", "HTTP监听地址(例如 :8080，不设置则执行单次查询模式)")
+	httpAddr := flag.String("http", "8080", "HTTP监听地址(例如 :8080，不设置则执行单次查询模式)")
 	flag.Parse()
 
 	rg, err := rgeocoder.NewRGeocoder(
