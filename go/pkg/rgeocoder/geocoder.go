@@ -44,7 +44,7 @@ func applyOptions(opts []Option) *Config {
 	cfg := &Config{
 		Mode:         MultiThreaded,
 		Verbose:      false,
-		DataDir:      filepath.Join(".", "go", "data"),
+		DataDir:      filepath.Join(".", "data"),
 		DownloadURLs: DefaultURLs,
 		MaxWorkers:   0,
 		CacheEnabled: true,
@@ -65,18 +65,32 @@ func NewRGeocoder(opts ...Option) (*RGeocoder, error) {
 		return nil, err
 	}
 
-	// 预期文件 rg_cities1000.csv
+	// 加载数据: 优先新目录 ./data, 回退旧目录 ./go/data
 	citiesFile := filepath.Join(cfg.DataDir, "rg_cities1000.csv")
+	fmt.Printf("checking data file: %s\n", citiesFile)
+
+	if _, errStat := os.Stat(citiesFile); errors.Is(errStat, os.ErrNotExist) {
+		panic("data file rg_cities1000.csv not found; please download or generate it in " + cfg.DataDir)
+	}
+
 	var coords []Coordinate
 	var locs []Location
 	if _, err := os.Stat(citiesFile); errors.Is(err, os.ErrNotExist) {
 		if cfg.Verbose {
-			fmt.Println("data file not found, placeholder empty dataset")
+			fmt.Println("dataset not found, using empty dataset")
 		}
 	} else {
-		// TODO: 调用 DataLoader 读取
-		if cfg.Verbose {
-			fmt.Println("found existing dataset (loader not implemented yet)")
+		loader := NewDataLoader(cfg)
+		c, l, err := loader.LoadFromFile(citiesFile)
+		if err != nil {
+			if cfg.Verbose {
+				fmt.Println("failed to load dataset:", err)
+			}
+		} else {
+			coords, locs = c, l
+			if cfg.Verbose {
+				fmt.Printf("loaded %d locations\n", len(locs))
+			}
 		}
 	}
 
@@ -93,9 +107,11 @@ func NewRGeocoder(opts ...Option) (*RGeocoder, error) {
 // NewRGeocoderWithStream 使用内存流初始化
 func NewRGeocoderWithStream(stream io.Reader, opts ...Option) (*RGeocoder, error) {
 	cfg := applyOptions(opts)
-	// TODO: 使用 DataLoader.LoadFromStream
-	coords := []Coordinate{}
-	locs := []Location{}
+	loader := NewDataLoader(cfg)
+	coords, locs, err := loader.LoadFromStream(stream)
+	if err != nil {
+		return nil, err
+	}
 	var tree KDTreeInterface
 	if cfg.Mode == SingleThreaded {
 		tree = NewKDTree(coords)

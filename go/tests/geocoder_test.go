@@ -30,6 +30,9 @@ func TestStreamDataset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("query single failed: %v", err)
 	}
-	if loc.Name != "" { /* placeholder: loader not implemented so Name empty */
+	if loc.Name != "SampleCity" {
+		if loc.Name == "" {
+			t.Fatalf("expected SampleCity got empty")
+		}
 	}
 }

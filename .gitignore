@@ -25,3 +25,5 @@ CMakeCache.txt
 main
 Makefile
 libreverse_geocode.a
+go/rgeocoder.exe
+go/smoke_output.txt
