@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/your-username/reverse-geocoder-go/pkg/rgeocoder"
 )
@@ -13,7 +14,7 @@ import (
 func main() {
 	mode := flag.Int("mode", 2, "查询模式: 1=单线程 2=多线程")
 	verbose := flag.Bool("verbose", false, "是否输出详细日志")
-	httpAddr := flag.String("http", "8080", "HTTP监听地址(例如 :8080，不设置则执行单次查询模式)")
+	httpAddr := flag.String("http", "8080", "HTTP监听地址(例如 :8080，留空则执行单次查询模式，默认8080)")
 	flag.Parse()
 
 	rg, err := rgeocoder.NewRGeocoder(
@@ -26,7 +27,14 @@ func main() {
 	defer rg.Close()
 
 	if *httpAddr != "" {
-		if err := runHTTPServer(rg, *httpAddr); err != nil {
+		addr := *httpAddr
+		// 允许用户输入 "8080" 或 "0.0.0.0:8080" 或 ":8080"
+		if !strings.Contains(addr, ":") {
+			addr = ":" + addr
+		} else if strings.HasPrefix(addr, ":") && len(addr) == 1 { // 防止传入仅":"
+			addr = ":8080"
+		}
+		if err := runHTTPServer(rg, addr); err != nil {
 			log.Fatalf("HTTP服务启动失败: %v", err)
 		}
 		return
